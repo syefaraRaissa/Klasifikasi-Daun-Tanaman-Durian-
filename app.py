@@ -4,39 +4,86 @@ import numpy as np
 import json
 from PIL import Image
 import os
-import gdown
+import requests
 
 # =========================
-# Load model dan label (versi Google Drive)
+# Konfigurasi model & file
 # =========================
 MODEL_PATH = "durian_leaf_disease_model.h5"
 CLASS_INDEX_PATH = "class_indices.json"
 
-# 🔽 Ganti ID ini dengan ID file Drive kamu
-drive_url = "https://huggingface.co/Syefara/durian-leaf-disease/resolve/main/durian_leaf_disease_model.h5"  # <-- ganti sesuai ID file kamu
+# GANTI dengan URL file .h5 di Hugging Face (resolve/main)
+# contoh: "https://huggingface.co/username/durian-leaf-disease/resolve/main/durian_leaf_disease_model.h5"
+MODEL_URL = "https://huggingface.co/<username>/durian-leaf-disease/resolve/main/durian_leaf_disease_model.h5"
 
-# Jika model belum ada di lokal, unduh otomatis
+# =========================
+# Fungsi util: download dengan chunk (lebih aman)
+# =========================
+def download_file_stream(url: str, target_path: str, chunk_size: int = 32768, timeout: int = 120):
+    """Download file secara streaming dan simpan ke target_path."""
+    with requests.get(url, stream=True, timeout=timeout) as resp:
+        resp.raise_for_status()
+        total = 0
+        with open(target_path, "wb") as f:
+            for chunk in resp.iter_content(chunk_size=chunk_size):
+                if not chunk:
+                    continue
+                f.write(chunk)
+                total += len(chunk)
+    return total
+
+# =========================
+# Pastikan class_indices ada
+# =========================
+if not os.path.exists(CLASS_INDEX_PATH):
+    st.error(f"File `{CLASS_INDEX_PATH}` tidak ditemukan. Pastikan file tersebut ada di repo.")
+    st.stop()
+
+with open(CLASS_INDEX_PATH, "r") as f:
+    class_indices = json.load(f)
+class_labels = {v: k for k, v in class_indices.items()}
+
+# =========================
+# Download model jika perlu
+# =========================
 if not os.path.exists(MODEL_PATH):
-    with st.spinner("📦 Mengunduh model dari Hugging Face..."):
-        r = requests.get(model_url)
-        open(MODEL_PATH, "wb").write(r.content)
+    try:
+        with st.spinner("📦 Mengunduh model dari Hugging Face... (ini mungkin memakan waktu beberapa menit untuk file besar)"):
+            bytes_downloaded = download_file_stream(MODEL_URL, MODEL_PATH)
+        st.success(f"✅ Model terunduh: {bytes_downloaded/1e6:.2f} MB")
+    except Exception as e:
+        st.error("Gagal mengunduh model. Periksa URL Hugging Face dan pastikan file bersifat public.")
+        st.write("Detail error:", repr(e))
+        st.stop()
 
-# Load model setelah diunduh
-model = tf.keras.models.load_model(MODEL_PATH)
+# Tampilkan info ukuran file (debug)
+try:
+    file_size_mb = os.path.getsize(MODEL_PATH) / 1e6
+    st.write(f"Model file size: {file_size_mb:.2f} MB")
+except Exception:
+    st.write("Tidak dapat membaca ukuran file model.")
 
-# Load class indices
-with open(CLASS_INDEX_PATH) as f:
-    class_indices = json.load(f)
+# =========================
+# Load model dengan cache agar tidak di-load berulang
+# =========================
+@st.cache_resource
+def load_keras_model(path):
+    try:
+        m = tf.keras.models.load_model(path)
+        return m
+    except OSError as e:
+        # Tampilkan pesan yang membantu
+        st.error("Gagal memuat model (.h5). Kemungkinan file korup atau format tidak kompatibel.")
+        st.write("Detail OSError:", repr(e))
+        st.write("""
+            Langkah perbaikan yang disarankan:
+            1. Buka file .h5 di browser Hugging Face dan pastikan ukuran sama seperti file lokal asal.  
+            2. Download file .h5 ke mesin lokal dan tes `tf.keras.models.load_model('durian_leaf_disease_model.h5')` di komputermu.  
+            3. Jika file sangat besar atau load memakan memori, pertimbangkan konversi ke TFLite atau menyimpan sebagai SavedModel (folder).  
+        """)
+        st.stop()
 
-# Membalik mapping agar index -> nama kelas
-class_labels = {v: k for k, v in class_indices.items()}
-
-
-with open(CLASS_INDEX_PATH) as f:
-    class_indices = json.load(f)
-
-# Membalik mapping agar index -> nama kelas
-class_labels = {v: k for k, v in class_indices.items()}
+model = load_keras_model(MODEL_PATH)
 
 # =========================
 # Informasi penyakit
@@ -128,13 +175,10 @@ disease_info = {
 }
 
 # =========================
-# Konfigurasi halaman
+# UI: Setup page
 # =========================
 st.set_page_config(page_title="Klasifikasi Penyakit Daun Durian", page_icon="🥭", layout="wide")
 
-# =========================
-# Header utama
-# =========================
 st.markdown("""
     <div style="text-align:center; padding: 2rem 0;">
         <h1 style="color:#1b4332;">🌿 Klasifikasi Penyakit Daun Durian</h1>
@@ -145,9 +189,6 @@ st.markdown("""
     </div>
 """, unsafe_allow_html=True)
 
-# =========================
-# Petunjuk penggunaan
-# =========================
 with st.expander("📘 Cara Menggunakan"):
     st.markdown("""
     1. Upload gambar daun durian yang ingin diperiksa  
@@ -156,7 +197,7 @@ with st.expander("📘 Cara Menggunakan"):
     """)
 
 # =========================
-# Upload gambar
+# Upload & Prediksi
 # =========================
 uploaded_file = st.file_uploader("📤 Upload Gambar Daun Durian", type=["jpg", "jpeg", "png"])
 
@@ -171,9 +212,9 @@ if uploaded_file is not None:
     if st.button("🔍 Klasifikasi Gambar"):
         with st.spinner("Menganalisis gambar..."):
             preds = model.predict(img_array)
-            class_id = np.argmax(preds)
-            confidence = np.max(preds)
-            label = class_labels[class_id]
+            class_id = int(np.argmax(preds))
+            confidence = float(np.max(preds))
+            label = class_labels.get(class_id, "UNKNOWN")
 
         st.success(f"**Hasil Klasifikasi: {label.replace('_', ' ').title()} ({confidence*100:.2f}%)**")
 
@@ -195,7 +236,6 @@ if uploaded_file is not None:
                 st.markdown(f"**{i}.** {s}")
         else:
             st.info("Informasi penyakit tidak tersedia untuk hasil ini.")
-
 else:
     st.info("Silakan upload gambar daun durian terlebih dahulu untuk memulai analisis.")
 
