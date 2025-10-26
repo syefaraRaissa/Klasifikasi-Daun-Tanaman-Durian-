@@ -79,7 +79,9 @@ def load_keras_model(path):
         3. Gunakan model_baru.keras di Streamlit
         """)
         st.stop()
-
+# 🔥 Tambahkan baris ini:
+model = load_keras_model(MODEL_PATH)
+                         
 # =========================
 # Informasi penyakit
 # =========================
