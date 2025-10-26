@@ -60,15 +60,25 @@ if not os.path.exists(MODEL_PATH):
 @st.cache_resource
 def load_keras_model(path):
     try:
-        model = tf.keras.models.load_model(path, compile=False)  # Format modern .keras
+        # Pakai custom_objects untuk model lama
+        model = tf.keras.models.load_model(
+            path,
+            compile=False,
+            custom_objects={"Functional": tf.keras.models.Model}
+        )
         return model
     except Exception as e:
-        st.error("❌ Gagal memuat model (.keras). Pastikan file valid.")
+        st.error("❌ Gagal memuat model (.keras). Mungkin struktur model lama (Flatten menerima list).")
         st.write("Detail error:", repr(e))
+        st.info("""
+        💡 Solusi terbaik:
+        1. Buka model .h5 asli di Colab
+        2. Jalankan:
+           model = tf.keras.models.load_model('model.h5')
+           model.save('model_baru.keras', save_format='keras')
+        3. Gunakan model_baru.keras di Streamlit
+        """)
         st.stop()
-
-model = load_keras_model(MODEL_PATH)
-st.success("✅ Model berhasil dimuat!")
 
 # =========================
 # Informasi penyakit
