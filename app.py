@@ -3,14 +3,33 @@ import tensorflow as tf
 import numpy as np
 import json
 from PIL import Image
+import os
+import gdown
 
 # =========================
-# Load model dan label
+# Load model dan label (versi Google Drive)
 # =========================
 MODEL_PATH = "durian_leaf_disease_model.h5"
 CLASS_INDEX_PATH = "class_indices.json"
 
+# 🔽 Ganti ID ini dengan ID file Drive kamu
+drive_url = "https://drive.google.com/uc?id=1AbCDeFgHiJKlMnOP"  # <-- ganti sesuai ID file kamu
+
+# Jika model belum ada, download otomatis dari Google Drive
+if not os.path.exists(MODEL_PATH):
+    with st.spinner("📦 Mengunduh model dari Google Drive..."):
+        gdown.download(drive_url, MODEL_PATH, quiet=False)
+
+# Load model setelah diunduh
 model = tf.keras.models.load_model(MODEL_PATH)
+
+# Load class indices
+with open(CLASS_INDEX_PATH) as f:
+    class_indices = json.load(f)
+
+# Membalik mapping agar index -> nama kelas
+class_labels = {v: k for k, v in class_indices.items()}
+
 
 with open(CLASS_INDEX_PATH) as f:
     class_indices = json.load(f)
