@@ -15,10 +15,11 @@ CLASS_INDEX_PATH = "class_indices.json"
 # 🔽 Ganti ID ini dengan ID file Drive kamu
 drive_url = "https://huggingface.co/Syefara/durian-leaf-disease/resolve/main/durian_leaf_disease_model.h5"  # <-- ganti sesuai ID file kamu
 
-# Jika model belum ada, download otomatis dari Google Drive
+# Jika model belum ada di lokal, unduh otomatis
 if not os.path.exists(MODEL_PATH):
-    with st.spinner("📦 Mengunduh model dari Google Drive..."):
-        gdown.download(drive_url, MODEL_PATH, quiet=False)
+    with st.spinner("📦 Mengunduh model dari Hugging Face..."):
+        r = requests.get(model_url)
+        open(MODEL_PATH, "wb").write(r.content)
 
 # Load model setelah diunduh
 model = tf.keras.models.load_model(MODEL_PATH)
