@@ -13,7 +13,7 @@ MODEL_PATH = "durian_leaf_disease_model.h5"
 CLASS_INDEX_PATH = "class_indices.json"
 
 # 🔽 Ganti ID ini dengan ID file Drive kamu
-drive_url = "https://drive.google.com/uc?id=1AbCDeFgHiJKlMnOP"  # <-- ganti sesuai ID file kamu
+drive_url = "https://drive.google.com/file/d/1fvK4YhwlyTd6ykZR_OwhylRR9egt1Huh/view?usp=drive_link"  # <-- ganti sesuai ID file kamu
 
 # Jika model belum ada, download otomatis dari Google Drive
 if not os.path.exists(MODEL_PATH):
